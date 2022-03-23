@@ -1,6 +1,6 @@
 # Ignored folder
-/Gitlab/
-/Local/
+/*Gitlab/
+/*Local/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

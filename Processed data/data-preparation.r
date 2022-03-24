@@ -23,7 +23,7 @@
 # Load packages
 library(tidyverse)
 
-# Download files from Gitlab
+# Download raw data from Gitlab
 paths <- read.csv("Processed data/raw-data-paths.csv", header = FALSE)[, 1]
 pav <- lapply(paths, read_csv)
 qua <- read.csv("https://gitlab.pavlovia.org/csander/sii1-proberecog-1f/raw/master/additional%20data/qualtrics.csv")[-c(1, 2), ] # nolint
@@ -180,4 +180,4 @@ d_long <- trials %>%
 # ---------------------------
 
 # Export data
-saveRDS(d_long, file = "Processed data/d_long.rds")
+saveRDS(d_long, file = "Processed data/d-long.rds")

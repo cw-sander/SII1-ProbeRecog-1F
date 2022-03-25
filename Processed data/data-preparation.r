@@ -16,7 +16,9 @@
 ## Email: carsten.sander@uni-hamburg.de
 ## ---------------------------
 ## Notes:
-##   
+##  Before running this script, make sure your working directory
+##  is set to a folder containing the /Processed data/ folder from
+##  the github repository
 ##
 ## ---------------------------
 
@@ -175,9 +177,11 @@ d_long <- trials %>%
     left_join(ratings) %>%
     filter(subject_id %in% subjects$subject_id) %>%
     left_join(subjects) %>%
-    left_join(stims)
+    left_join(stims) %>%
+    select(-rt)
 
 # ---------------------------
 
 # Export data
 saveRDS(d_long, file = "Processed data/d-long.rds")
+d_long <- readRDS("Processed data/d-long.rds")

@@ -1,13 +1,36 @@
-# METADATA
-# date: 
+## ---------------------------
+## Script name: analyses.r
+##
+## Purpose of script:
+##  Code used to perform the analyses
+##  reported in the paper.
+##
+## Author: Carsten Sander
+##
+## Date Created: 2022-02-23
+##
+## Copyright (c) Carsten Sander, 2022
+## Email: carsten.sander@uni-hamburg.de
+## ---------------------------
+## Notes:
+##  Before running this script, make sure your working directory
+##  is set to a folder containing the /Processed data/ folder from
+##  the github repository
+##
+## ---------------------------
 
+# Load packages
 library(effsize)
 library(tidyverse)
 library(ggpubr)
 library(broom)
-d_long <- readRDS("Outputs/d_long.rds")
 
-# Prepare for by_participants rt analysis
+# Read data
+d_long <- readRDS("Processed data/d_long.rds")
+
+# ---------------------------
+
+# Prepare data for by-participant rt analysis
 d_rt_long <- d_long %>%
     filter(is_correct == 1) %>%
     select(-starts_with("rating_"), -item_id, -label, -is_correct, -rt) %>%

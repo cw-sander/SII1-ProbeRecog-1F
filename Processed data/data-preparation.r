@@ -20,6 +20,7 @@
 ##  is set to a folder containing the /Processed data/ folder from
 ##  the github repository
 ##
+##  R Version -- 4.1.2
 ## ---------------------------
 
 # Load packages

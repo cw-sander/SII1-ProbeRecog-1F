@@ -17,16 +17,17 @@
 ##  is set to a folder containing the /Processed data/ folder from
 ##  the github repository
 ##
+##  R Version -- 4.1.2
 ## ---------------------------
 
 # Load packages
-library(effsize)
-library(tidyverse)
-library(ggpubr)
-library(broom)
+library(effsize) # effsize_0.8.1
+library(tidyverse) # tidyverse_1.3.1
+library(ggpubr) # ggpubr_0.4.0
+library(broom) # broom_0.7.12
 
 # Read data
-d_long <- readRDS("Processed data/d_long.rds")
+d_long <- readRDS("Processed data/d-long.rds")
 
 # ---------------------------
 

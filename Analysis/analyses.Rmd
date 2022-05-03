@@ -1,0 +1,365 @@
+---
+title: "Analyses for SII Study 1"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+# load packages
+library(effsize) # effsize_0.8.1
+library(tidyverse) # tidyverse_1.3.1
+library(ggpubr) # ggpubr_0.4.0
+library(broom) # broom_0.7.12
+library(here) # here_1.0.1
+library(apaTables)
+library(lmerTest)
+
+# Read data
+d_long <- readRDS(here::here("Processed data/d-long.rds"))
+
+# Prepare data
+d_rt_long <- d_long %>%
+    filter(is_correct == 1) %>%
+    select(subject_id, probe_type, age, gender,
+           starts_with("rt_"), starts_with("pol_")) %>%
+    group_by(
+        subject_id, probe_type, age, gender,
+        pol_interest, pol_orientation, pol_satisfaction,
+    ) %>%
+    summarize(across(everything(), mean, na.rm = TRUE)) %>%
+    ungroup()
+d_rt <- d_rt_long %>%
+    pivot_wider(
+        names_from = probe_type,
+        values_from = starts_with("rt_"),
+        names_sep = "_"
+    ) %>%
+    mutate(rt_M2SD_log_diff = rt_M2SD_log_im - rt_M2SD_log_io)
+```
+
+### Introduction
+Research on person perception has revealed that people tend to attribute other’s behavior on stable person characteristics, even if it can just as well be explained by more malleable causes like situational factors or mental states. This tendency is known as the correspondence bias (Gilbert & Malone, 1995) and may play an important role in the domain of political polarization. Specifically, people may attribute each other’s politically relevant behaviors to stable ideological dispositions (such as leftist, conservative, racist or feminist), while neglecting potential other causes and thereby impeding mutual understanding. To investigate the role of the correspondence bias in political polarization we first examine whether ideological dispositions are spontaneously inferred from behavioral descriptions, thus extending previous research on spontaneous trait inferences (STI, Winter & Uleman, 1984) to spontaneous inferences of ideological dispositions. We expect reaction times of correct classifications of implied probes (i.e., ideological probe words implied by but not included in the sentence) to be slower than of probes that were not implied in the sentence (but rather in another sentence of the task).
+
+### Sample Characteristics
+We collected data from a total of N = 170 participants. Following our pre-registered exclusion criteria, we excluded five participants whose average correct response times were slower than two standard deviations over the sample mean, one who self-reported not having followed the instructions conscientiously and one who rated their own data to be unfit for analysis. This resulted in a sample of N = 163 participants (`r nrow(filter(d_rt, gender == "female"))` female, `r nrow(filter(d_rt, gender == "male"))` male, `r nrow(filter(d_rt, gender == "other"))` other; average age M = `r round(mean(d_rt$age), 1)` years, SD = `r round(sd(d_rt$age), 1)`, ranging from `r min(d_rt$age)` to `r max(d_rt$age)`). Participants were recruited via the online platform Prolific (www.prolific.co) and received monetary compensation of 3.13 GBP for completing the 25-minute study.
+
+On average, participants reported to be rather left leaning (M = `r round(mean(d_rt$pol_orientation), 1)`, SD = `r round(sd(d_rt$pol_orientation), 1)` on a scale from 1 = left to 10 = right), rather interested in politics (M = `r round(mean(d_rt$pol_interest), 1)`, SD = `r round(sd(d_rt$pol_interest), 1)`, on a scale ranging from 1 = not at all to 10 = very strongly), and moderately satisfied with the German political system (M = `r round(mean(d_rt$pol_satisfaction), 1)`, SD = `r round(sd(d_rt$pol_satisfaction), 1)`, on a scale ranging from 1 = satisfied to 4 = dissatisfied).
+
+```{r hypothesis}
+# Visual inspection of normality
+# hist(d_rt$rt_M2SD_log_diff) # nolint
+
+# Descriptives
+m_im <- format(round(mean(d_rt$rt_M2SD_log_im), 2), nsmall = 2)
+m_io <- format(round(mean(d_rt$rt_M2SD_log_io), 2), nsmall = 2)
+sd_im <- format(round(sd(d_rt$rt_M2SD_log_im), 2), nsmall = 2)
+sd_io <- format(round(sd(d_rt$rt_M2SD_log_io), 2), nsmall = 2)
+# One-sided paired t-test
+t1 <- t.test(d_rt$rt_M2SD_log_im, d_rt$rt_M2SD_log_io,
+             paired = TRUE, alternative = "greater")
+# P-value in apa format
+t1_p <- ifelse(t1$p.value < 0.001, "p < .001",
+               paste("p =", sub("0.", ".", round(t1$p.value, 3))))
+# Calculating d_z as mean difference divided by sd of the differences
+d_z <- format(round(mean(d_rt$rt_M2SD_log_im - d_rt$rt_M2SD_log_io) /
+                    sd(d_rt$rt_M2SD_log_im - d_rt$rt_M2SD_log_io), 2),
+              nsmall = 2)
+```
+### Preregistered hypothesis
+To prepare the reaction time data for our main anlysis we applied an individual cut-off of the individual mean plus two standard deviations for slow responses and the log-transformation. Upon visual inspection the differences between the implied and implied-other conditions did not seem severely non-normal. We therefore conducted a paired t-test. On average, participants responded significantly slower in the implied condition (M = `r m_im`, SD = `r sd_im`) than in the implied other condition (M = `r m_io`, SD = `r sd_io`), t(`r t1$parameter`) = `r round(t1$statistic, 2)`, `r t1_p`, d~z~ = `r d_z`.
+```{r hypothesis visualization}
+plot <- ggboxplot(d_rt_long, x = "probe_type", y = "rt_M2SD_log",
+    palette = "jco") +
+    stat_compare_means(paired = TRUE, method = "t.test",
+    comparisons = list(c("im", "io")), label = "p.format") +
+    rremove("legend") +
+    scale_x_discrete(labels = c("implied", "implied other")) +
+    theme(panel.background = element_rect(fill = "transparent", colour = NA),
+    plot.background = element_rect(fill = "transparent", colour = NA))
+plot <- ggpar(plot,
+    xlab = "Probe type",
+    ylab = "Mean reaction time")
+plot
+```
+
+### Multiverse analysis
+Because there are no conventions regarding outlier correction and transformations, we follow a recommendation by Krieglmeyer & Deutsch (2010) and employ a multiverse analysis using different cut-off criteria (no cut-off, 2500 ms, 2000 ms, and 1500 ms) and transformations (no transformation, a log-transformation, and an inverse transformation) and report each combination's effects on the results.
+```{r multiverse}
+# Select all variables containing reaction time means
+d_multi <- d_rt %>%
+    select(starts_with("rt")) %>%
+    pivot_longer(
+        cols = everything(),
+        names_to = c("del", "cutoff", "trans", "probe_type"),
+        values_to = "rt",
+        names_sep = "_"
+    ) %>%
+    select(-del)
+# Loop over all combinations of cutoffs and transformations
+multi <- data.frame(
+    cutoff = rep(c("none", "M2SD", "f25", "f20", "f15"), 3),
+    transformation = c(rep("none", 5), rep("log", 5), rep("inv", 5)))
+for (c in seq(nrow(multi))) {
+    # Filter data using c-th cutoff and transformation
+    d_multi_c <- d_multi %>%
+        filter(cutoff == multi$cutoff[c] & trans == multi$transformation[c])
+    # Calculate test and effect size
+    t1 <- t.test(d_multi_c$rt[d_multi_c$probe_type == "im"],
+                       d_multi_c$rt[d_multi_c$probe_type == "io"],
+                       paired = TRUE, alternative = "greater")
+    d_z <- mean(d_multi_c$rt[d_multi_c$probe_type == "im"] -
+                  d_multi_c$rt[d_multi_c$probe_type == "io"]) /
+                  sd(d_multi_c$rt[d_multi_c$probe_type == "im"] -
+                  d_multi_c$rt[d_multi_c$probe_type == "io"])
+    # Save test statistics
+    multi$t[c] <- format(round(t1$statistic, 2), nsmall = 2)
+    multi$df[c] <- format(t1$parameter)
+    multi$p[c] <- ifelse(t1$p.value < 0.001, "p < .001", paste("p =", sub("0.", ".", round(t1$p.value, 3)))) # nolint
+    multi$d_z[c] <- format(round(d_z, 2), nsmall = 2)
+}
+# Print multiverse table
+knitr::kable(multi, format = "markdown")
+```
+
+```{r error rate analysis, message = FALSE}
+# Prepare data
+d_er_long <- d_long %>%
+    filter(is_correct == 1) %>%
+    group_by(subject_id, probe_type) %>%
+    summarize(correct_responses = n()) %>%
+    mutate(er = (24 - correct_responses) / 24) %>%
+    select(-correct_responses)
+d_er <- d_er_long %>%
+    pivot_wider(names_from = probe_type, values_from = er)
+
+# Visual inspection of normality
+# hist(d_er$im - d_er$io) # nolint
+
+# Descriptives
+mdn_im <- round(median(d_er$im), 2)
+mdn_io <- round(median(d_er$io), 2)
+# One-sided wilcoxon signed-rank test
+wcx <- wilcox.test(d_er$im, d_er$io, paired = TRUE, alternative = "greater")
+# P-value in apa format
+wcx_p <- ifelse(wcx$p.value < 0.001, "p < .001",
+               paste("p =", sub("0.", ".", round(wcx$p.value, 3))))
+# Calculating r as z divided by the square-root of n
+wcx_r <- round(qnorm(wcx$p.value / 2) / sqrt(nrow(d_er) * 2), 2)
+```
+### Exploratory error rate analysis
+Upon visual inspection the differences between the implied and implied-other conditions seemed severely non-normal. We therefore conducted a wilcoxon signed-rank test. On average, participants' error rates were significantly higher in the implied condition (Mdn = `r mdn_im`) than in the implied other condition (Mdn = `r mdn_io`), `r wcx_p`, r = `r wcx_r`.
+```{r error rate analysis visualization}
+plot <- ggboxplot(d_er_long, x = "probe_type", y = "er",
+    palette = "jco") +
+    stat_compare_means(paired = TRUE, method = "wilcox.test",
+    comparisons = list(c("im", "io")), label = "p.format") +
+    rremove("legend") +
+    scale_x_discrete(labels = c("implied", "implied other")) +
+    theme(panel.background = element_rect(fill = "transparent", colour = NA),
+    plot.background = element_rect(fill = "transparent", colour = NA))
+plot <- ggpar(plot,
+    xlab = "Probe type",
+    ylab = "Error rate")
+plot
+```
+
+```{r speed accuracy trade-off, message = FALSE, fig.show = "hide"}
+d_trade <- left_join(d_rt, d_er)
+diff_rt <- d_trade$rt_M2SD_log_im - d_trade$rt_M2SD_log_io
+diff_er <- d_trade$im - d_trade$io
+cor1 <- cor.test(diff_rt, diff_er)
+cor1_df <- cor1$parameter
+cor1_r <- round(cor1$estimate, 2)
+cor1_p <- ifelse(cor1$p.value < 0.001, "p < .001",
+                 paste("p =", sub("0.", ".", round(cor1$p.value, 3))))
+plot(diff_rt, diff_er, main = "Speed-Accuracy Trade-Off",
+     xlab = "SII Effect in RTs",
+     ylab = "SII Effect in Error Rates", pch = 19)
+```
+### Speed-accuracy trade-off
+If there were a trade-off between the speed and accuracy of the participants' responses, one would expect the SII-effects in the reaction times and error rates to be negatively correlated, such that participants with smaller effects in one outcome show greater effects in the other. A Pearson correlation coefficient was computed to assess the linear relationship between the SII-effects in the reaction times and error rates. There was no significant correlation between the two outcome variables, r(`r cor1_df`) = `r cor1_r`, `r cor1_p`, indicating that there was no speed-accuracy trade-off.
+
+### Exploratory by-item analyses {.tabset}
+We conducted exploratory by-item analyses. The data could be grouped either by item (controlling for properties of the behavioral information) or by label (controlling for properties of the label probe). Because either analysis can be informative, we present both. The SII-effect was only significantly correlated with the clustered consensus score (percentage of participants who in a pretest generated the implied label or a semantically associated label) and only when the data was grouped by item.
+
+There were some items with negative effects. Specifically, the afdler_1 item had a negative effect, which might be due to the implied other label being a potentially strong antonym ("links"), that was activated in response to the statement (even more so than the implied label). Furthermore, the hippie_1 item had a negative effect, potentially also because the implied other label ("konservativ") being implied by (parts of) the statement. The kommunist_1 item had a null effect, which we could more confidently attribute to the implied other label ("Verschwörungstheoretikerin") being implied by the statement. Lastly, although the links_4 item had a positive effect, we deemed it unfit for further use because of its pacifist content presumably being interpreted differently in light of the 2022 Russian invasion of Ukraine.
+```{r by-item analyses, message = FALSE}
+# Prepare data
+d_item <- d_long %>%
+    # Set RTs of incorrect responses to NA
+    mutate(across(starts_with("rt_"), ~ifelse(is_correct == 0, NA, .))) %>%
+    select(
+        item_id, label, probe_type, behavior, sconsensus, cconsensus,
+        label_score, rt_M2SD_log, rt_M2SD_none, matches("rating_")) %>%
+    group_by(
+        item_id, label, probe_type, behavior,
+        sconsensus, cconsensus, label_score) %>%
+    # Calculate mean RTs and ratings for each item_id and probe_type
+    summarize(across(matches("rt_|rating_"), ~mean(.x, na.rm = TRUE))) %>%
+    ungroup() %>%
+    # Count words in each behavioral description
+    mutate(word_count = unlist(lapply(str_extract_all(.$behavior, "[[:alpha:]]+"), length))) # nolint
+
+# Arrange data by item_id, such that comparisons are between
+# different labels presented after the same behavioral description
+d_item_by_id <- d_item %>%
+    pivot_wider(
+        names_from = probe_type,
+        values_from = c(matches("rt_|rating"), label),
+        names_sep = "_") %>%
+    mutate(
+        diff_M2SD_log = rt_M2SD_log_im - rt_M2SD_log_io,
+        diff_availability = rating_availability_im - rating_availability_io,
+        diff_identity = rating_identity_im - rating_identity_io,
+        diff_valence = rating_valence_im - rating_valence_io) %>%
+    select(
+        item_id, label_im, label_io, behavior, rt_M2SD_none_im,
+        rt_M2SD_none_io, diff_M2SD_log, sconsensus, cconsensus, label_score,
+        word_count, diff_availability, diff_valence, diff_identity)
+
+# Arrange data by label, such that comparisons are between
+# identical labels presented after different behavioral descriptions
+d_item_by_label <- d_item %>%
+    pivot_wider(
+        names_from = probe_type,
+        values_from = c(
+            matches("rt_|rating|consensus"),
+            item_id, label_score, behavior, word_count),
+        names_sep = "_") %>%
+     mutate(
+        diff_M2SD_log = rt_M2SD_log_im - rt_M2SD_log_io,
+        diff_sconsensus = sconsensus_im - sconsensus_io,
+        diff_cconsensus = cconsensus_im - cconsensus_io,
+        diff_label_score = label_score_im - label_score_io,
+        diff_word_count = word_count_im - word_count_io,
+        availability = rating_availability_im,
+        valence = rating_valence_im,
+        identity = rating_identity_im) %>%
+    select(
+        label, item_id_im, item_id_io, behavior_im, behavior_io,
+        rt_M2SD_none_im, rt_M2SD_none_io, diff_M2SD_log, diff_sconsensus,
+        diff_cconsensus, diff_label_score, diff_word_count, availability,
+        valence, identity)
+
+# Print APA-style correlation matrix for by-id analysis
+# apa.cor.table(select(
+#     d_item_by_id, diff_M2SD_log, sconsensus, cconsensus, label_score,
+#     word_count, diff_availability, diff_identity, diff_valence))
+# Print APA-style correlation matrix for by-label analysis
+# apa.cor.table(select(
+#     d_item_by_label, diff_M2SD_log, diff_sconsensus,
+#     diff_cconsensus, diff_label_score, diff_word_count,
+#     availability, identity, valence))
+
+# Knit by-item data.frames
+# knitr::kable(d_item_by_id, format = "markdown")
+# knitr::kable(d_item_by_label, format = "markdown")
+# write.csv(d_item_by_id, here::here("Analysis/item_by_id.csv"))
+# write.csv(d_item_by_label, here::here("Analysis/item_by_label.csv"))
+```
+
+#### Grouped by item id
+```{r by-id scatter plot}
+ggscatter(
+    d_item_by_id,
+    "rt_M2SD_none_im",
+    "rt_M2SD_none_io",
+    label = "item_id",
+    xlab = "RT in implied condition",
+    ylab = "RT in implied other condition") +
+    geom_abline(intercept = 0, slope = 1)
+```
+
+#### Grouped by label
+```{r by-label scatter plot}
+ggscatter(
+    d_item_by_label,
+    "rt_M2SD_none_im",
+    "rt_M2SD_none_io",
+    label = "label",
+    xlab = "RT in implied condition",
+    ylab = "RT in implied other condition") +
+    geom_abline(intercept = 0, slope = 1)
+```
+
+```{r moderation analyses, message = FALSE}
+# By using multilevel models
+d_mlm <- d_long %>%
+    # Set RTs of incorrect responses to NA
+    mutate(across(starts_with("rt_"), ~ifelse(is_correct == 0, NA, .))) %>%
+    select(
+        subject_id, label, probe_type,
+        rt_M2SD_none, starts_with("rating_"),
+        age, gender, starts_with("pol_")) %>%
+    pivot_wider(
+        names_from = probe_type,
+        values_from = c(matches("rt_|rating")),
+        names_sep = "_") %>%
+    mutate(
+        rt_diff = rt_M2SD_none_im - rt_M2SD_none_io,
+        gender = na_if(gender, "other"),
+        # Grand mean center level 2 predictors
+        age = age - mean(age),
+        pol_orientation = pol_orientation - mean(pol_orientation),
+        pol_interest = pol_interest - mean(pol_interest),
+        pol_satisfaction = pol_satisfaction - mean(pol_satisfaction)
+    ) %>%
+    group_by(subject_id) %>%
+    mutate(
+        # Group mean center level 1 predictors
+        availability = rating_availability_im - mean(rating_availability_im),
+        valence = rating_valence_im - mean(rating_valence_im),
+        identity = rating_identity_im - mean(rating_identity_im)
+    ) %>%
+    ungroup() %>%
+    select(-matches("rating_|rt_M2SD"))
+
+# Intercept only model to check whether multilevel analysis is necessary
+lm1 <- lm(rt_diff ~ 1, data = d_mlm)
+mlm1 <- lmerTest::lmer(rt_diff ~ 1 + (1 | subject_id), data = d_mlm)
+mlm1_var <- as.data.frame(VarCorr(mlm1))
+mlm1_compare <- anova(mlm1, lm1)
+# Get values for reporting
+mlm1_compare_p <- ifelse(mlm1_compare[2, "Pr(>Chisq)"] < 0.001, "p < .001",
+    paste("p =", sub("0.", ".", round(mlm1_compare[2, "Pr(>Chisq)"], 3))))
+mlm1_delta_r2 <- round(mlm1_var$vcov[1] / sum(mlm1_var$vcov) * 100, 2)
+
+# Run multilevel model with ratings
+mlm2 <- lmerTest::lmer(rt_diff ~ availability + valence + identity +
+                       (1 | subject_id), data = d_mlm)
+mlm2_var <- as.data.frame(VarCorr(mlm2))
+# Calculate increases in R-squared
+mlm2_delta_r2_lvl1 <- round((mlm1_var[2, 4] - mlm2_var[2, 4]) / mlm1_var[2, 4] * 100, 2) # nolint
+mlm2_delta_r2_lvl2 <- round((mlm1_var[1, 4] - mlm2_var[1, 4]) / mlm1_var[1, 4] * 100, 2) # nolint
+# Compare model fit
+anova(mlm2, mlm1)
+# Calculate effect size for identity rating
+coef <- summary(mlm2)$coefficients
+coef_identity <- abs(round(coef[rownames(coef) == "identity", "Estimate"] * 1000, 2)) # nolint
+
+# Run multilevel model with level 2 predictors
+mlm3 <- lmerTest::lmer(rt_diff ~ availability + valence + identity +
+                       pol_orientation + pol_interest + pol_satisfaction +
+                       (1 | subject_id), data = d_mlm)
+mlm3_var <- as.data.frame(VarCorr(mlm3))
+# Calculate increases in R-squared
+mlm3_delta_r2_lvl2 <- round((mlm2_var[1, 4] - mlm3_var[1, 4]) / mlm2_var[1, 4] * 100, 2) # nolint
+# Compare model fit
+anova(mlm3, mlm2)
+```
+### Exploratory moderation analyses
+We performed exploratory moderation analyses to investigate whether the ratings regarding the availability and valence of the labels as well as the identification with the labels could explain the strength of the SII-effect. We used a difference score (implied minus implied other) of the reaction times (using an individual mean plus two standard deviations cut-off for slow responses and no transformation) as the dependent variable. To test whether a multilevel modelling approach was necessary we built an intercept only model and tested whether a random effect for the participants significantly increased the model fit. The random intercept model fit the data significantly better, $\chi^2$(`r mlm1_compare$Df[2]`, `r mlm1_compare$npar[1]`) = `r round(mlm1_compare$Chisq[2], 2)`, `r mlm1_compare_p` (even though the variance explained by the random effect was only `r mlm1_delta_r2` %). We thus fitted a multilevel model. The data was assigned to two levels – the reaction time difference level (level 1) and the participant level (level 2). As independent variables at level 1 we used the ratings of availability, valence, and identification. All ratings were centered using the individual participant mean rather than the grand mean. The reasoning behind this was that participants might have different response tendencies such that a label's rating relative to all the other labels' ratings would be a better predictor than the absolute values. Moreover, in a second step we added the participants' political orientation, political interest and satisfaction with the German political system as independent variables at level 2 (participant level).
+
+Model I contained only the level 1 predictors. Of the three ratings only the extent to which participants identified with the labels predicted the size of the SII-effect. An increase of one scale point (on a five point scale ranging from not at all to very strongly identified) was associated with a decrease of `r coef_identity` ms in the SII-effect. This indicates that participants more strongly inferred labels the less they identified with them. Together the three ratings explain `r mlm2_delta_r2_lvl1` % of the variance on level 1 and `r mlm2_delta_r2_lvl2` % of the variance on level 2.
+
+Model II contained the level 1 and level 2 predictors. Of the six predictors still only the identification rating was significantly associated with the SII-effect. Together the six predictors explain `r mlm3_delta_r2_lvl2` % of the variance on level 2. As the 
+
+```{r multilevel visualization, message = FALSE, warning = FALSE}
+plot <- ggplot(d_mlm, aes(x = identity, y = rt_diff, group = subject_id)) + 
+    geom_point(size = 1, col = "grey") +
+    labs(y = "SII-effect", x = "Identification") +
+    geom_smooth(method = "lm", se = F, size = 0.2, color = "black", alpha = 0.1) + # nolint
+    theme(legend.position = "none")
+plot
+```

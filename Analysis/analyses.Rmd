@@ -79,8 +79,10 @@ plot <- ggboxplot(d_rt_long, x = "probe_type", y = "rt_M2SD_log",
     plot.background = element_rect(fill = "transparent", colour = NA))
 plot <- ggpar(plot,
     xlab = "Probe type",
-    ylab = "Mean reaction time")
+    ylab = "Mean reaction time (log-transformed)")
 plot
+# ggexport(plot, width = 4, height = 4,
+#     filename = here::here("Analysis/H1 Boxplot.pdf"))
 ```
 
 ### Multiverse analysis
@@ -120,6 +122,8 @@ for (c in seq(nrow(multi))) {
 }
 # Print multiverse table
 knitr::kable(multi, format = "markdown")
+# Save multiverse table as csv
+# write.csv(multi, here::here("Analysis/multiverse.csv"))
 ```
 
 ```{r error rate analysis, message = FALSE}
@@ -162,6 +166,8 @@ plot <- ggpar(plot,
     xlab = "Probe type",
     ylab = "Error rate")
 plot
+# ggexport(plot, width = 4, height = 4,
+#     filename = here::here("Analysis/H1 Error Rate Boxplot.pdf"))
 ```
 
 ```{r speed accuracy trade-off, message = FALSE, fig.show = "hide"}

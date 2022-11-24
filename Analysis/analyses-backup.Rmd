@@ -491,7 +491,7 @@ er_ex %>%
     geom_jitter(
       # Replace all non-outlier values by NA
       data = mutate(er, er = replace(er, is_extreme == FALSE, NA)),
-      width = 0.25, height = 0.007, shape = 4, color = "#7A8450",
+      width = 0.25, height = 0.007, shape = 4,
       size = 4, show.legend = FALSE) +
     theme_cs_talk()
   } %T>%
@@ -579,10 +579,90 @@ d_trade_off %>%
        filename = here::here("Analysis/trade-off-plot.pdf"))
 ```
 
-### Exploratory by-item and analyses {.tabset}
-We conducted exploratory by-item analyses. We grouped the data by label and probe type and aggregated the response latencies (using an individual mean plus two standard deviations cutoff for slow responses and the log-transformation). For each item we calculated the SII-effect as a difference score (implied minus implied-other), with higher values indicating stronger inference effects.
+### Exploratory by-item and by-label analyses {.tabset}
+We conducted exploratory by-item analyses. The data could be grouped either by item (controlling for properties of the behavioral information) or by label (controlling for properties of the label probe). Because either analysis can be informative, we present both.
 
-It should be noted, that the difference scores could be calculated in two ways, differing with regards to what is defined as the implied-other label. As we presented two ideological labels after each statement - one implied and one not implied (that is implied in another statement) - the obvious way would be to take the difference between these two labels. However, with the length and currency of the two labels being potentially dissimilar, these differences might be confounded. The less obvious but in our opinion superior way is to take the difference between an implied label and the same label serving as an implied-other label in a different item. This way by-item effects are not confounded by word length or currency.
+#### Correlations by item
+```{r by-item correlation, message = FALSE}
+item_rate <- d_long %>%
+  filter(probe_type == "im") %>%
+  select(
+    item_id,
+    identity = rating_identity,
+    valence = rating_valence,
+    availability = rating_availability) %>%
+  group_by(item_id) %>%
+  summarize(.groups = "drop",
+    across(c(identity, valence, availability), mean, na.rm = TRUE))
+item <- d_long %>%
+  select(item_id, behavior, probe_type, rt = rt_M2SD_log, is_correct) %>%
+  mutate(across(rt, ~ifelse(is_correct == 0, NA, .)), .keep = "unused") %>%
+  group_by(item_id, behavior, probe_type) %>%
+  summarize(.groups = "drop", rt = mean(rt, na.rm = TRUE)) %>%
+  pivot_wider(names_from = probe_type, values_from = rt) %>%
+  mutate(sii_effect = im - io, .keep = "unused") %>%
+  left_join(item_rate)
+
+c1 <- item %>%
+  select(sii_effect, identity, valence, availability) %>%
+  cor_table()
+
+knitr::kable(c1, format = "markdown")
+```
+
+For the by-item analysis we grouped the data by item and probe type and aggregated the response latencies (using an individual mean plus two standard deviations cutoff for slow responses and the log-transformation). For each item we calculated the SII-effect as a difference score (implied minus implied-other), with higher values indicating stronger inference effects.
+
+There were some items with negative effects. Specifically, the "afdler_1" item had a negative effect, which might be due to the implied other label being a potentially strong antonym ("links"), that was activated in response to the statement (even more so than the implied label). Furthermore, the "hippie_1" item had a negative effect, potentially also because the implied other label ("konservativ") being implied by (parts of) the statement. The "kommunist_1" item had a null effect, which we could more confidently attribute to the implied other label ("Verschwörungstheoretikerin") being accidentally implied by the statement.
+
+We calculated correlations between the SII-effect and the three ratings (identity, valence, and availability). None of the correlations reached significance.
+
+#### Identity
+```{r by-item sii identity, message = FALSE}
+item %>%
+  {
+    ggplot(., aes(x = identity, y = sii_effect)) +
+    labs(x = "Mean identity rating", y = "SII effect") +
+    geom_abline(intercept = 0, slope = 0, color = "#7A8450") +
+    geom_point(color = "#7A8450") +
+    geom_label_repel(size = 4.3, label = .$item_id, box.padding = 0.2,
+      family = "Nunito", color = "#7A8450") +
+    theme_cs_talk()
+  } %T>%
+  ggexport(width = 7, height = 6,
+       filename = here::here("Analysis/by-item-identity.pdf"))
+```
+
+#### Valence
+```{r by-item sii valence, message = FALSE}
+item %>%
+  {
+    ggplot(., aes(x = valence, y = sii_effect)) +
+    labs(x = "Mean valence rating", y = "SII effect") +
+    geom_abline(intercept = 0, slope = 0, color = "#7A8450") +
+    geom_point(color = "#7A8450") +
+    geom_label_repel(size = 4.3, label = .$item_id, box.padding = 0.2,
+      family = "Nunito", color = "#7A8450") +
+    theme_cs_talk()
+  } %T>%
+  ggexport(width = 7, height = 6,
+       filename = here::here("Analysis/by-item-valence.pdf"))
+```
+
+#### Availability
+```{r by-item availability, message = FALSE}
+item %>%
+  {
+    ggplot(., aes(x = availability, y = sii_effect)) +
+    labs(x = "Mean availability rating", y = "SII effect") +
+    geom_abline(intercept = 0, slope = 0, color = "#7A8450") +
+    geom_point(color = "#7A8450") +
+    geom_label_repel(size = 4.3, label = .$item_id, box.padding = 0.2,
+      family = "Nunito", color = "#7A8450") +
+    theme_cs_talk()
+  } %T>%
+  ggexport(width = 7, height = 6,
+       filename = here::here("Analysis/by-item-availability.pdf"))
+```
 
 #### Correlations by label
 ```{r by-label correlation, message = FALSE}
@@ -605,14 +685,18 @@ label <- d_long %>%
   mutate(sii_effect = rt_im - rt_io, .keep = "unused") %>%
   left_join(label_rate, by = "label")
 
-c1 <- label %>%
+c2 <- label %>%
   select(sii_effect, identity, valence, availability) %>%
   cor_table()
 
-knitr::kable(c1, format = "markdown")
+knitr::kable(c2, format = "markdown")
 ```
 
-The SII-effect was not significantly correlated with any of the ratings. Descriptively the identity ratings most strongly predicted the SII-effect.
+For the by-label analysis we grouped the data by label and probe type and aggregated the response latencies (using an individual mean plus two standard deviations cutoff for slow responses and the log-transformation). For each item we calculated the SII-effect as a difference score (implied minus implied-other), with higher values indicating stronger inference effects.
+
+There was one label with a negative effect, namely the label "links". This might be because when used as an implied other label it was a strong antonym of the implied label. This might have led to the label being activated.
+
+We calculated correlations between the SII-effect and the three ratings (identity, valence, and availability). Again, none of the correlations reached significance.
 
 #### Identity
 ```{r by-label sii identity, message = FALSE}
@@ -663,6 +747,49 @@ label %>%
 ```
 
 ### Exploratory multilevel analyses {.tabset}
+```{r multilevel analyses item, message = FALSE}
+d_mlm_item <- d_long %>%
+  # Set RTs of incorrect responses to NA
+  mutate(rt = ifelse(is_correct == 0, NA, rt_M2SD_none), .keep = "unused") %>%
+  select(
+    subject_id, item_id, label, probe_type, rt, starts_with("rating_"),
+    age, gender, starts_with("pol_")) %>%
+  pivot_wider(
+    names_from = probe_type,
+    values_from = c(matches("rt|rating|label")),
+    names_sep = "_") %>%
+  mutate(
+    sii_effect = rt_im - rt_io,
+    gender = na_if(gender, "other"),
+    # Grand mean center level 2 predictors
+    age = age - mean(age, na.rm = TRUE),
+    pol_orientation = pol_orientation - mean(pol_orientation),
+    pol_interest = pol_interest - mean(pol_interest),
+    pol_satisfaction = pol_satisfaction - mean(pol_satisfaction)
+  ) %>%
+  group_by(subject_id) %>%
+  mutate(
+    # Group mean center level 1 predictors
+    availability = rating_availability_im - mean(rating_availability_im),
+    valence = rating_valence_im - mean(rating_valence_im),
+    identity = rating_identity_im - mean(rating_identity_im)
+  ) %>%
+  ungroup() %>%
+  left_join(
+    select(item, -behavior, -sii_effect),
+    by = "item_id", suffix = c("", "_item")) %>%
+  mutate(
+    # Grand mean center level 2 predictors
+    identity_item = identity_item - mean(identity_item),
+    valence_item = valence_item - mean(valence_item),
+    availability_item = availability_item - mean(availability_item)) %>%
+  select(-matches("rating_|rt_"))
+
+c3 <- d_mlm_item %>%
+  select(sii_effect, identity, valence, availability) %>%
+  cor_table()
+```
+
 ```{r multilevel analyses label, message = FALSE}
 d_mlm_label <- d_long %>%
   # Set RTs of incorrect responses to NA
@@ -701,41 +828,65 @@ d_mlm_label <- d_long %>%
     availability_label = availability_label - mean(availability_label)) %>%
   select(-matches("rating_|rt_"))
 
-c2 <- d_mlm_label %>%
+c4 <- d_mlm_label %>%
   select(sii_effect, identity, valence, availability) %>%
   cor_table()
 ```
 
-We performed exploratory multilevel analyses to investigate whether the ratings regarding the availability and valence of the labels as well as the identification with the labels could explain the strength of the SII-effect. We used difference scores calculated from two raw response latencies (implied minus implied-other) as our dependent variable (again using an individual mean plus two standard deviations cutoff for slow responses and the log-transformation). As in the by-item analyses we calculated the SII-effects by taking the difference between an implied label and the same label serving as an implied-other label to prevent confounding by word length or currency. We first calculated zero-order correlations. The SII-effect was negatively correlated with identity ratings and valence ratings. All ratings were significantly intercorrelated.
+We performed exploratory moderation analyses to investigate whether the ratings regarding the availability and valence of the labels as well as the identification with the labels could explain the strength of the SII-effect. We used a difference score (implied minus implied other) of the reaction times (using an individual mean plus two standard deviations cut-off for slow responses and no transformation) as the dependent variable. To test whether a multilevel modelling approach was necessary we built an intercept only model and tested whether a random effect for the participants significantly increased the model fit.
+
+#### Zero-order by item
+```{r zero-order item}
+knitr::kable(c3, format = "markdown")
+```
 
 #### Zero-order by label
 ```{r zero-order label}
-knitr::kable(c2, format = "markdown")
+knitr::kable(c4, format = "markdown")
 ```
 
 ```{r models}
-mlm1 <- lmer(sii_effect ~ identity +
+# Intercept only
+mlm1 <- lm(sii_effect ~ 1, data = d_mlm_label)
+# Add random effects
+mlm2 <- lmer(sii_effect ~ 1 + (1 | subject_id) + (1 | label),
+        data = d_mlm_label, REML = FALSE)
+# Add level 1 predictors (item ratings)
+mlm3 <- lmer(sii_effect ~ identity + valence + availability +
         (1 | subject_id) + (1 | label),
         data = d_mlm_label, REML = FALSE)
-mlm2 <- lmer(sii_effect ~ valence +
+# Add level 2 predictors (mean item ratings)
+mlm4 <- lmer(sii_effect ~ identity + valence + availability +
+        identity_label + valence_label + availability_label +
         (1 | subject_id) + (1 | label),
         data = d_mlm_label, REML = FALSE)
-mlm3 <- lmer(sii_effect ~ availability +
-        (1 | subject_id) + (1 | label),
-        data = d_mlm_label, REML = FALSE)
+
+# Compare models
+mlm2_test <- mlm_compare(mlm2, mlm1)
+mlm3_test <- mlm_compare(mlm3, mlm2)
+mlm4_test <- mlm_compare(mlm4, mlm3)
+
+# Calculate effect size for identity rating
+coef <- abs(round(summary(mlm4)$coefficients[, 1] * 1000, 2))
+coef_baserate <- coef[names(coef) == "baserate"]
+coef_sufficiency <- coef[names(coef) == "sufficiency"]
+coef_necessity_item <- coef[names(coef) == "necessity_item"]
+coef_sufficiency_item <- coef[names(coef) == "sufficiency_item"]
 ```
+
+Text
 
 #### Model I
 ```{r multilevel model 1}
-sjPlot::tab_model(mlm1)
+sjPlot::tab_model(mlm2)
 ```
 
 #### Model II
 ```{r multilevel model 2}
-sjPlot::tab_model(mlm2)
+sjPlot::tab_model(mlm3)
 ```
 
 #### Model III
 ```{r multilevel model 3}
-sjPlot::tab_model(mlm3)
+sjPlot::tab_model(mlm4)
 ```

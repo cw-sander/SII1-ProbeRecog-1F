@@ -53,14 +53,15 @@ for (i in seq(length(pav))) {
         ) %>%
         mutate(
             probe_type = recode(probe_type,
-                "implied" = "im", "implied_other" = "io"))
+                "implied" = "im", "implied_other" = "io"),
+            rt = rt * 1000)
     # Calculate individual cutoff (M + 2 * SD) based on correct responses
     rts <- trials_i$rt[trials_i$is_correct == 1]
     m2sd <- mean(rts) + 2 * sd(rts)
     # Define matrix of cutoff/transformation combinations
     corrections <- data.frame(
         cutoff = rep(c("none", "M2SD", "f25", "f20", "f15"), 3),
-        cutoff_value = rep(c(Inf, m2sd, 2.5, 2.0, 1.5), 3),
+        cutoff_value = rep(c(Inf, m2sd, 2500, 2000, 1500), 3),
         trans = c(rep("none", 5), rep("log", 5), rep("inv", 5)),
         trans_function = c(rep("{}", 5), rep("log({})", 5), rep("(1 / {}) * -1", 5))) # nolint
     # For each combination of cutoff criteria and transformations
@@ -184,5 +185,5 @@ d_long <- trials %>%
 # ---------------------------
 
 # Export data
-saveRDS(d_long, file = "Processed data/d-long.rds")
+saveRDS(d_long, file = "Processed data/d-long-new.rds")
 d_long <- readRDS("Processed data/d-long.rds")

@@ -219,7 +219,9 @@ theme_cs_talk <- function(font = "Nunito", lab_size = 16, label_size = 14,
   panel.background = element_rect(fill = "transparent"),
   legend.background = element_rect(fill = "transparent", color = NA),
   strip.background = element_rect(color = facet_fill,
-    fill = facet_fill, size = 1),
+    fill = facet_fill, linewidth = 1),
+  panel.border = element_rect(color = dark, fill = NA, linewidth = 1),
+  legend.key = element_rect(fill = "transparent", color = NA_character_),
   # Text elements
   plot.title = element_text(family = font, size = lab_size,
     face = "bold", hjust = 0, vjust = 2, color = dark),
@@ -240,11 +242,9 @@ theme_cs_talk <- function(font = "Nunito", lab_size = 16, label_size = 14,
   strip.text = element_text(family = font, size = label_size,
     color = facet_text, margin = margin(4, 4, 4, 4)),
   # Line elements
-  axis.ticks = element_line(color = dark, size = 0.5),
-  legend.key = element_rect(fill = "transparent", color = NA_character_),
+  axis.ticks = element_line(color = dark, linewidth = 0.5),
   panel.grid.major = element_blank(),
-  panel.grid.minor = element_blank(),
-  panel.border = element_rect(color = dark, fill = NA, size = 1)
+  panel.grid.minor = element_blank()
   )
 }
 ```
@@ -301,9 +301,9 @@ rt_dz <- rt_ex %>%
   pull(effsize)
 
 # Print t-test
-rt_t_report <- paste0("t(", rt_t$n1, ") = ", forma(rt_t$statistic),
+rt_t_report <- paste0("t(", rt_t$df, ") = ", forma(rt_t$statistic),
   ", ", formp(rt_t$p, TRUE), ", d~z~ = ", forma(rt_dz))
-rt_t_plot <- paste0("t(", rt_t$n1, ") = ", forma(rt_t$statistic),
+rt_t_plot <- paste0("t(", rt_t$df, ") = ", forma(rt_t$statistic),
   ",\n", formp(rt_t$p, TRUE), ",\nd~z~ = ", forma(rt_dz))
 ```
 
@@ -355,9 +355,9 @@ knitr::kable(rt_desc, format = "markdown")
 rt_desc %>%
   {
     ggplot(., aes(probe_type, mean)) +
-    labs(x = "Probe type", y = "Mean response latency in seconds") +
+    labs(x = "Probe type", y = "Mean response latency in ms") +
     geom_bar(stat = "identity", color = "#7A8450", fill = "white") +
-    coord_cartesian(ylim = c(0.65, 0.87)) +
+    coord_cartesian(ylim = c(650, 870)) +
     geom_linerange(aes(ymin = ci95_low, ymax = ci95_upp), color = "#7A8450") +
     geom_label(aes(x = 2.08, y = 0.85, label = rt_t_plot),
       fill = "white", color = "#7A8450", show.legend = FALSE,
@@ -422,7 +422,7 @@ for (c in seq_along(mv[, 1])) {
 knitr::kable(mv, format = "markdown")
 ```
 
-Because there are no conventions regarding outlier correction and transformations, we follow a recommendation by Krieglmeyer & Deutsch (2010) and employ a multiverse analysis using different cut-off criteria (no cut-off, 2500 ms, 2000 ms, and 1500 ms) and transformations (no transformation, a log-transformation, and an inverse transformation) and report each combination's effects on the results.
+Because there are no conventions regarding outlier correction and transformations, we follow the example of Krieglmeyer & Deutsch (2010) and employ a multiverse analysis using different cut-off criteria (none, individual M + 2 SD, 2500 ms, 2000 ms, and 1500 ms) and transformations (none, log, inverse) and report each combination's effects on the results.
 
 The effect of probe type was highly significant across all combinations of cutoff criteria and transformations. The effect size ranged from d~z~ = `r mv$d_z[1]` for untransformed response latencies with no cutoff to d~z~ = `r mv$d_z[10]` for log transformed response latencies with a 1500 ms cutoff.
 
@@ -439,27 +439,15 @@ er <- d_long %>%
     errors = sum(is_correct == 0),
     n_trials = n()) %>%
   mutate(er = errors / n_trials, .keep = "unused") %>%
-  # Find extreme outliers
-  mutate(is_extreme = is_extreme(er)) %>%
-  ungroup() %T>%
-  # Count participants that have extreme outliers
-  assign(x = "er_ex_n", envir = .GlobalEnv, value = n_distinct(
-    select(filter(., is_extreme == TRUE), subject_id)))
-
-# Create data frame where participants with extreme values are excluded
-er_ex <- er %>%
-  filter(is_extreme == FALSE) %>%
-  group_by(subject_id) %>%
-  filter(n() == 2) %>%
   ungroup()
 
 # Descriptives
-er_desc <- er_ex %>%
+er_desc <- er %>%
   group_by(probe_type) %>%
   get_summary_stats(er, type = "median_iqr")
 
 # One-sided wilcoxon signed-rank test
-er_wcx <- er_ex %>%
+er_wcx <- er %>%
   wilcox_test(
     er ~ probe_type,
     paired = TRUE,
@@ -467,43 +455,23 @@ er_wcx <- er_ex %>%
     ref.group = "implied")
 
 # Wilcoxon effect size r
-er_wcx_r <- er_ex %>%
+er_wcx_r <- er %>%
   wilcox_effsize(er ~ probe_type,
     paired = TRUE, ref.group = "implied") %>%
   pull(effsize)
 
 # Print wilcoxon test
-er_wcx_report <- paste0("Z = ", forma(er_wcx_r * sqrt(nrow(er_ex) / 2)),
-  ", ", formp(rt_t$p, TRUE), ", r = ", forma(er_wcx_r))
-er_wcx_plot <- paste0("Z = ", forma(er_wcx_r * sqrt(nrow(er_ex) / 2)),
-  ",\n", formp(rt_t$p, TRUE), ",\nr = ", forma(er_wcx_r))
+er_wcx_report <- paste0("Z = ", forma(er_wcx_r * sqrt(nrow(er) / 2)),
+  ", ", formp(er_wcx$p, TRUE), ", r = ", forma(er_wcx_r))
+er_wcx_plot <- paste0("Z = ", forma(er_wcx_r * sqrt(nrow(er) / 2)),
+  ",\n", formp(er_wcx$p, TRUE), ",\nr = ", forma(er_wcx_r))
 ```
 
 We conducted an exploratory error rate analysis to test whether participants not only responded more slowly in the implied condition but also made more errors.
 
-#### Outlier detection
-```{r er outlier, warning = FALSE, message = FALSE}
-er_ex %>%
-  {
-    ggplot(., aes(probe_type, er)) +
-    geom_boxplot(color = "#7A8450") +
-    labs(x = "Probe type", y = "False recognition rate") +
-    geom_jitter(
-      # Replace all non-outlier values by NA
-      data = mutate(er, er = replace(er, is_extreme == FALSE, NA)),
-      width = 0.25, height = 0.007, shape = 4, color = "#7A8450",
-      size = 4, show.legend = FALSE) +
-    theme_cs_talk()
-  } %T>%
-  ggexport(width = 5, height = 5,
-       filename = here::here("Analysis/er-outlier-plot.pdf"))
-```
-
-We looked for extreme outliers in each cell of the design. We defined them as values above Q3 + 3 * IQR or below Q1 - 3 * IQR. We found and excluded `r er_ex_n` participants whose values were extreme outliers. 
-
 #### QQ-Plot
 ```{r er qq, message = FALSE}
-er_ex %>%
+er %>%
   pivot_wider(names_from = probe_type, values_from = er) %>%
   mutate(diff = implied - `implied other`) %>%
   {
@@ -518,6 +486,23 @@ er_ex %>%
 ```
 
 Upon visual inspection the differences between the implied and implied-other conditions seemed severely non-normal. We therefore conducted a wilcoxon signed-rank test.
+
+#### Skewness
+```{r er skewness, warning = FALSE, message = FALSE}
+er %>%
+  pivot_wider(names_from = probe_type, values_from = er) %>%
+  mutate(diff = implied - `implied other`) %>%
+  {
+    ggplot(., aes(x = diff)) +
+    geom_histogram(color = "#7A8450", fill = "white") +
+    labs(x = "Differences in error rates", y = "Number of observations") +
+    theme_cs_talk()
+  } %T>%
+  ggexport(width = 5, height = 5,
+       filename = here::here("Analysis/er-skewness-plot.pdf"))
+```
+
+Upon visual inspection the differences between the implied and implied-other condition seemed severely skewed. Although this violates one of its assumptions, we still computed a wilcoxon signed-rank test.
 
 #### Wilcoxon test
 A wilcoxon signed-rank test showed that participants' error rates were significantly higher in the implied condition (Mdn = `r forma(er_desc$median[1])`) than in the implied other condition (Mdn = `r forma(er_desc$median[2]) `), `r er_wcx_report`.
@@ -548,7 +533,7 @@ er_desc %>%
 ```{r speed accuracy trade-off, message = FALSE}
 # Merge response latency and error rate data
 d_trade_off <- rt_ex %>%
-  left_join(er_ex, by = c("subject_id", "probe_type")) %>%
+  left_join(er, by = c("subject_id", "probe_type")) %>%
   select(subject_id, probe_type, rt = rt_M2SD_log, er) %>%
   pivot_wider(names_from = probe_type, values_from = c(er, rt)) %>%
   mutate(

@@ -1,5 +1,12 @@
 # Ignored folders
 
+# Ignored documents
+Preregistration/Ethics votum.pdf
+Preregistration/Preregistration.pdf
+Preregistration/Qualtrics survey.pdf
+Processed data/raw-data-paths.csv
+Processed data/data-preparation.r
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.pyc
